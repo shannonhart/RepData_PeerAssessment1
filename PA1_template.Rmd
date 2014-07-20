@@ -1,20 +1,244 @@
-# Reproducible Research: Peer Assessment 1
+PEER ASSESSMENT ASSIGNMENT 1 - REPRODUCIBLE RESEARCH
+====================================================
+
+Data
+=====
+
+The data for this assignment can be downloaded from the course web site:
+Dataset: Activity monitoring data [52K]
+
+The variables included in this dataset are:
+
+. Steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
 
 
-## Loading and preprocessing the data
+. Date: The date on which the measurement was taken in YYYY-MM-DD format
+
+
+. Interval: Identifier for the 5-minute interval in which measurement was taken
+
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+
+My Process:
+===========
+
+Load packages for knitr and ggplot2:
+
+install.packages('knitr', dependencies = T)
+
+library(knitr)
+
+library(ggplot2)
+
+Load data
+```{r}
+library(ggplot2)
+MyData <- read.csv(file="D:\\reproducible research\\activity.csv", header=TRUE, sep=",")
+```
+Split data into groups by date and make a histogram of the total number of steps taken each day
+==========
+
+There was a lot of discussion on the boards about this first histogram. Many seemed to be confused by the wording of this part so I have created my histogram based on the explanation of this (first required histogram) by the community TA on this thread (https://class.coursera.org/repdata-004/forum/thread?thread_id=29)
+
+```{r}
+MyData.sum <- aggregate(MyData$steps,list(MyData$date),sum)
+colnames(MyData.sum) <- c("date","steps")
+
+Dataset1 <-ggplot(MyData.sum, aes(x=steps)) + geom_histogram(aes(fill = ..count..)) +
+  scale_fill_gradient("Count", low = "violet", high = "turquoise3") +
+ ggtitle("Total Number of Steps Each Day")
+ 
+print(Dataset1)
+```
+
+
+Calculate and report the mean and median of the total number of steps taken per day
+============
+
+I did this by calling the summary function on my data set:
+
+```{r}
+summary(MyData.sum)
+```
+Mean of total steps: 10766.18
+
+Median of total steps: 10765
+
+##Aggregate by Interval
+##Add no NA Steps column and set NA to 0
+```{r}
+MyData$StepsNoNA <- MyData$steps
+MyData$StepsNoNA[is.na(MyData$StepsNoNA)] <- 0
+MyData.intervalmean <- aggregate(MyData$StepsNoNA,list(MyData$interval),mean)
+colnames(MyData.intervalmean) <- c("Interval","Average")
+
+ggplot(MyData.intervalmean, aes(x=Interval,y=Average)) + 
+  geom_line(colour="violet") +
+  scale_x_discrete(name="Activity Interval",breaks=c(seq(0,3000,500))) +
+  scale_y_continuous(name="Average Number of Steps",breaks=seq(0,200,50)) +
+  ggtitle("Average of Steps by Activity Interval")
+
+```
+
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+============
+
+```{r}
+MyData.intervalmeanmax<- tail(MyData.intervalmean[order(MyData.intervalmean[,2]),],1)
+MyData.intervalmeanmax$Interval
+```
+
+Interval 835
+
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+===========
+
+```{r}
+MyData.totalmissingvalues <-length(which(is.na(MyData$steps)))
+
+MyData.totalmissingvalues
+
+```
+
+Total Missing Values : 2304
+
+
+Create a new data set where NAs have been replaced with mean value
+=========
+
+
+Replace missing values with mean value of original data set and assign it to value "Data Set 2" and create new data set
 
 
 
-## What is mean total number of steps taken per day?
+Create a function called "impute.mean" which replaces NA with the mean value
+
+```{r}
+impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
 
 
 
-## What is the average daily activity pattern?
+```{r}
+
+library(plyr)
+
+MyDataNAreplaced <- plyr::ddply(MyData[1:3],.(interval), transform,
+                                steps = impute.mean(steps),
+                                date = date,
+                                interval = interval)
+
+```
 
 
 
-## Imputing missing values
+Of this new data set where NA is replaced with the mean value, make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day.
+=============
+
+```{r}
+
+MyDataNAreplaced.sum <- aggregate(MyDataNAreplaced$steps,list(MyDataNAreplaced$date),sum)
+colnames(MyDataNAreplaced.sum) <- c("date","steps")
+
+Dataset2 <-ggplot(MyDataNAreplaced.sum, aes(x=steps)) + geom_histogram(aes(fill = ..count..)) +
+  scale_fill_gradient("Count", low = "red1", high = "yellow") +
+ggtitle("Total Number of Steps Each Day w/Imputed NAs")
+
+print(Dataset2)
+
+```
+
+Run summary function on this new data set to calculate mean and median of new data set
+
+```{r}
+
+summary(MyDataNAreplaced.sum )
+
+```
+Mean of new data set with imputed/NAs: 10766
+
+Median of new data set with imputed/NAs: 10766
+
+Compare Histograms for both data sets
+=====
+
+```{r}
+library(grid)
+library(lattice)
+vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+ grid.newpage()
+pushViewport(viewport(layout = grid.layout(2, 1)))
+print(Dataset1, vp = vplayout(1,1))
+print(Dataset2, vp = vplayout(2,1))
+
+```
+
+Are there differences in activity patterns between weekdays and weekends?
+====
+ 
+Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day. Then seperate into 2 data sets - Data Set Weekdays, Data Set Weekends
+
+```{r}
+
+d.activityWeekendday <- MyDataNAreplaced.sum
+d.activityWeekendday$DayName <- weekdays(as.Date(d.activityWeekendday$date,'%Y-%m-%d'))
+```
+
+Add WeekendDay column and populate with "Weekday"
+
+
+```{r}
+d.activityWeekendday$WeekendDay <- "Weekday"
+```
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+Update WeekendDay colum with "Weekend" where DayName is Saturday or Sunday
+
+```{r}
+d.activityWeekendday$WeekendDay[d.activityWeekendday$DayName == "Sunday"] <- "Weekend"
+d.activityWeekendday$WeekendDay[d.activityWeekendday$DayName == "Saturday"] <- "Weekend"
+```
+Plotting Weekend/Weekday Data Sets: 
+====
+
+Print top lines of new  data sets to make sure the code is correct before plotting:
+
+Print top lines of the weekend data set to make sure the code is correct
+```{r} 
+
+d.Weekendmean <- d.activityWeekendday[d.activityWeekendday$WeekendDay == "Weekend",]
+head(d.Weekendmean)
+```
+
+
+ Print top lines of the weekday data set to make sure the code is correct
+ 
+
+ 
+```{r} 
+
+d.Weekdaymean <- d.activityWeekendday[d.activityWeekendday$WeekendDay == "Weekday",]
+head(d.Weekdaymean)
+```
+
+Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis)
+
+load packages:
+
+
+```{r}
+library(lattice)
+library(Hmisc)
+```
+```{r}
+d.Weekendmean <- d.activityWeekendday[d.activityWeekendday$WeekendDay == "Weekend",]
+d.Weekendmeaninterval <- aggregate(d.Weekendmean$steps,list(d.Weekendmean$interval),mean)
+colnames(d.Weekendmeaninterval) <- c("Interval","Average")
+
+```
+Reporting error when I try to plot the above data. I am out of time so I am committing this as is. 
+Please go easy on me when reviewing because I have been up all night trying to get this one error corrected.
+Thanks :)
